@@ -37,7 +37,8 @@
 #'                                 meta.learner.type = "S.Learner",
 #'                                 learners = c("SL.glm"),
 #'                                 nfolds = 5,
-#'                                 binary.outcome = TRUE)
+#'                                 binary.outcome = FALSE)
+#' print(slearner)
 #'
 #' \donttest{
 #' # estimate CATEs with T Learner
@@ -50,7 +51,9 @@
 #'                                   learners = c("SL.xgboost","SL.ranger",
 #'                                                "SL.nnet"),
 #'                                   nfolds = 5,
-#'                                   binary.outcome = TRUE)
+#'                                   binary.outcome = FALSE)
+#'
+#' print(tlearner)
 #'                                   }
 #'
 metalearner_ensemble <- function(data,
@@ -60,7 +63,7 @@ metalearner_ensemble <- function(data,
                                 learners = c("SL.glmnet", "SL.xgboost",
                                            "SL.ranger", "SL.nnet"),
                                 nfolds = 5,
-                                binary.outcome = TRUE)
+                                binary.outcome = FALSE)
   {
   if(meta.learner.type %in% c("S.Learner","T.Learner") == FALSE)
   {
@@ -231,15 +234,47 @@ metalearner_ensemble <- function(data,
     Y_hats <- data.frame("Y_hat0" = Y_hat_test_0,
                          "Y_hat1" = Y_hat_test_1)
 
-    learner_out <- list("CATEs" = score_meta,
+    learner_out <- list("formula" = cov.formula,
+                        "treat_var" = treat.var,
+                        "CATEs" = score_meta,
                         "Y_hats" = Y_hats,
                         "Meta_Learner" = meta.learner.type,
                         "ml_model1" = m1_mod,
-                        "ml_model0" = m0_mod)  }
+                        "ml_model0" = m0_mod,
+                        "learners" = learners)}
     Sys.sleep(.05)
     setTxtProgressBar(pb, f)
     }
   close(pb)
+  class(learner_out) <- "metalearner_ensemble"
   return(learner_out)
+}
+
+
+#' print.metalearner_ensemble
+#'
+#' @description
+#' Print method for \code{metalearner_ensemble}
+#' @param x `metalearner_ensemble` class object from \code{metalearner_ensemble}
+#' @param ... additional parameter
+#'
+#' @return list of model results
+#' @export
+#'
+
+print.pattc_ensemble <- function(x, ...){
+  cat("Method:\n")
+  cat("Ensemble Meta Learner\n")
+  cat(x$Meta_Learner)
+  cat("Formula:\n")
+  cat(deparse(x$formula))
+  cat("\n")
+  cat("Treatment Variable: ", x$treat_var)
+  cat("\n")
+  cat("SL Algorithms:\n")
+  cat(x$learners)
+  cat("\n")
+  cat("CATEs percentiles:\n")
+  print(quantile(x$CATEs, c(.10 ,.25, .50 ,.75, .90)))
 }
 

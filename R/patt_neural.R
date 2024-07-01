@@ -147,7 +147,7 @@ neuralnet_pattc_counterfactuals <- function (pop.data,
                                              neuralnet.response.mod,
                                              ID = NULL,
                                              cluster = NULL,
-                                             binary.outcome = TRUE){
+                                             binary.outcome = FALSE){
 
   compl.var <- pop.data$compl_var
   covariates <- all.vars(pop.data$response_formula)[-1]
@@ -215,11 +215,10 @@ neuralnet_pattc_counterfactuals <- function (pop.data,
 #' @param response.stepmax maximum number of steps for response model
 #' @param ID string for identifier variable
 #' @param cluster string for cluster variable.
-#' @param bootse logical for bootstrapped standard erros.
-#' @param bootp logical for bootstrapped p values.
-#' @param bootn logical for number of bootstraps.
 #' @param binary.outcome logical specifying predicted outcome variable will take
 #' binary values or proportions.
+#' @param bootstrap logical for bootstrapped PATT-C.
+#' @param nboot number of bootstrapped samples
 #'
 #' @return results of t test as PATTC estimate.
 #' @export
@@ -246,12 +245,31 @@ neuralnet_pattc_counterfactuals <- function (pop.data,
 #'                                response.stepmax = 1e+09,
 #'                                ID = NULL,
 #'                                cluster = NULL,
-#'                                bootse = FALSE,
-#'                                bootp = FALSE,
-#'                                bootn = 999,
-#'                                binary.outcome = TRUE)
+#'                                binary.outcome = FALSE)
 #'
-#' summary(pattc_neural)
+#' print(pattc_neural)
+#'
+#' pattc_neural_boot <- pattc_deepneural(response.formula = support_war ~ age + female +
+#'                                income + education +  employed + married +
+#'                                hindu + job_loss,
+#'                                exp.data = exp_data,
+#'                                pop.data = pop_data,
+#'                                treat.var = "strong_leader",
+#'                                compl.var = "compliance",
+#'                                compl.algorithm = "rprop+",
+#'                                response.algorithm = "rprop+",
+#'                                compl.hidden.layer = c(4,2),
+#'                                response.hidden.layer = c(4,2),
+#'                                compl.stepmax = 1e+09,
+#'                                response.stepmax = 1e+09,
+#'                                ID = NULL,
+#'                                cluster = NULL,
+#'                                binary.outcome = FALSE,
+#'                                bootstrap = TRUE,
+#'                                nboot = 2000)
+#'
+#' print(pattc_neural_boot)
+#'
 #' }
 #'
 pattc_deepneural <- function(response.formula,
@@ -267,10 +285,9 @@ pattc_deepneural <- function(response.formula,
                          response.stepmax = 1e+08,
                          ID = NULL,
                          cluster = NULL,
-                         bootse = FALSE,
-                         bootp = FALSE,
-                         bootn = 999,
-                         binary.outcome = TRUE)
+                         binary.outcome = FALSE,
+                         bootstrap = FALSE,
+                         nboot = 1000)
 
 {
   expdata <- expcall(response.formula,
@@ -318,18 +335,104 @@ pattc_deepneural <- function(response.formula,
     Y_hat1_1s <- sum(counterfactuals$Y_hat1)
     nY_hat1 <- length(counterfactuals$Y_hat1)
 
-    pattc <- prop.test(c(Y_hat1_1s, Y_hat1_0s), c(nY_hat1,nY_hat0),
+    pattc_xsq <- prop.test(c(Y_hat1_1s, Y_hat1_0s), c(nY_hat1,nY_hat0),
                        alternative = "two.sided", correct = FALSE)
+
+    conf_int <- pattc_xsq$conf.int[1:2]
+    diff <- pattc_xsq$estimate[1] - pattc_xsq$estimate[2]
+    estimate <- c(diff, conf_int)
+    names(estimate) <- c("PATT-C", "LCI (2.5%)", "UCI (2.5%)")
+    statistic <- c(pattc_xsq$statistic, pattc_xsq$p.value)
+    names(statistic) <- c("X_squared","p_value")
+    pattc <-list(estimate,
+                 pattc_xsq$method,
+                 statistic)
   }
-  else if(!binary.outcome) {
-    pattc <- t.test(x = counterfactuals$Y_hat1,
-                    y = counterfactuals$Y_hat0,
-                    alternative = "two.sided")
-  }
-  model.out<-list("exp_data" = expdata$exp_data,
+  else if (!binary.outcome){
+    if (bootstrap) {
+      bootResults <- matrix(NA, nrow = nboot, ncol = ncol(counterfactuals)+1)
+      for (i in seq_len(nboot)){
+        resample <- sample(1:nrow(counterfactuals),nrow(counterfactuals),replace=T)
+        temp <- counterfactuals[resample,]
+        A <- mean(temp[,1], na.rm=TRUE)
+        B <- mean(temp[,2], na.rm=TRUE)
+        bootResults[i,1] <- A
+        bootResults[i,2] <- B
+        bootResults[i,3] <- (B-A)
+        drop(list())
+      }
+      bootout = data.frame(bootResults[,1], bootResults[,2], bootResults[,3])
+      colnames(bootout) <- c(colnames(counterfactuals),"PATT-C")
+      bootPATTC <- mean(bootout[,3], na.rm=TRUE)
+      results <- c(bootPATTC, quantile(bootout[,3], c(0.025, 0.975)))
+      names(results) <- c("PATT-C", "LCI (2.5%)", "UCI (2.5%)")
+      method <- paste0("Bootstrapped PATT-C with ", nboot," samples")
+      boot.out <- list(method, results)
+      pattc <- boot.out
+    } else if (!bootstrap){
+      pattc_t <- t.test(x = counterfactuals$Y_hat1,
+                        y = counterfactuals$Y_hat0,
+                        alternative = "two.sided")
+      conf_int <- pattc_t$conf.int[1:2]
+      diff <- pattc_t$estimate[1] - pattc_t$estimate[2]
+      estimate <- c(diff, conf_int)
+      names(estimate) <- c("PATT-C", "LCI (2.5%)", "UCI (2.5%)")
+      statistic <- c(pattc_t$statistic, pattc_t$p.value)
+      names(statistic) <- c("t","p_value")
+      pattc <-list(estimate,
+                   pattc_t$method,
+                   statistic)
+    }}
+  model.out<-list("formula" = response.formula,
+                  "treat_var" = treat.var,
+                  "compl_var" =  compl.var,
+                  "compl_algorithm" = compl.algorithm,
+                  "response_algorithm" = response.algorithm,
+                  "compl_hidden_layer" = compl.hidden.layer,
+                  "response_hidden_layer" = response.hidden.layer,
+                  "compl_stepmax" = compl.stepmax,
+                  "response_stepmax" = compl.stepmax,
+                  "exp_data" = expdata$exp_data,
                   "pop_data" = popdata$pop_data,
                   "complier_prediction" = compliers,
                   "pop_counterfactual" = counterfactuals,
                   "PATT_C" = pattc)
+
+  class(model.out)<-"pattc_deepneural"
   return(model.out)
+}
+
+#' print.pattc_deepneural
+#'
+#' @description
+#' Print method for \code{pattc_deepneural}
+#' @param x `pattc_deepneural` class object from \code{pattc_deepneural}
+#' @param ... additional parameter
+#'
+#' @return list of model results
+#' @export
+#'
+
+print.pattc_ensemble <- function(x, ...){
+  cat("Method:\n")
+  cat("Deep Neural PATT-C\n")
+  cat("Formula:\n")
+  cat(deparse(x$formula))
+  cat("\n")
+  cat("Treatment Variable: ", x$treat_var)
+  cat("\n")
+  cat("Compliance Variable: ", x$compl_var)
+  cat("\n")
+  cat("Neural Network Algorithm:\n")
+  cat("Compliance Model: ",x$compl_algorithm)
+  cat("; Response Model: ",x$response_algorithm)
+  cat("\n")
+  cat("Hidden Layers:\n")
+  cat("Compliance Model: ",x$compl_hidden_layer)
+  cat("; Response Model: ",x$response_hidden_layer)
+  cat("\n")
+  cat("Estimate:\n")
+  cat(x$PATT_C[[1]])
+  cat("\n")
+  cat(x$PATT_C[[2]])
 }

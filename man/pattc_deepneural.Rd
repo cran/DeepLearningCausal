@@ -18,10 +18,9 @@ pattc_deepneural(
   response.stepmax = 1e+08,
   ID = NULL,
   cluster = NULL,
-  bootse = FALSE,
-  bootp = FALSE,
-  bootn = 999,
-  binary.outcome = TRUE
+  binary.outcome = FALSE,
+  bootstrap = FALSE,
+  nboot = 1000
 )
 }
 \arguments{
@@ -60,14 +59,12 @@ neurons in response model.}
 
 \item{cluster}{string for cluster variable.}
 
-\item{bootse}{logical for bootstrapped standard erros.}
-
-\item{bootp}{logical for bootstrapped p values.}
-
-\item{bootn}{logical for number of bootstraps.}
-
 \item{binary.outcome}{logical specifying predicted outcome variable will take
 binary values or proportions.}
+
+\item{bootstrap}{logical for bootstrapped PATT-C.}
+
+\item{nboot}{number of bootstrapped samples}
 }
 \value{
 results of t test as PATTC estimate.
@@ -99,12 +96,31 @@ pattc_neural <- pattc_deepneural(response.formula = support_war ~ age + female +
                                response.stepmax = 1e+09,
                                ID = NULL,
                                cluster = NULL,
-                               bootse = FALSE,
-                               bootp = FALSE,
-                               bootn = 999,
-                               binary.outcome = TRUE)
+                               binary.outcome = FALSE)
 
-summary(pattc_neural)
+print(pattc_neural)
+
+pattc_neural_boot <- pattc_deepneural(response.formula = support_war ~ age + female +
+                               income + education +  employed + married +
+                               hindu + job_loss,
+                               exp.data = exp_data,
+                               pop.data = pop_data,
+                               treat.var = "strong_leader",
+                               compl.var = "compliance",
+                               compl.algorithm = "rprop+",
+                               response.algorithm = "rprop+",
+                               compl.hidden.layer = c(4,2),
+                               response.hidden.layer = c(4,2),
+                               compl.stepmax = 1e+09,
+                               response.stepmax = 1e+09,
+                               ID = NULL,
+                               cluster = NULL,
+                               binary.outcome = FALSE,
+                               bootstrap = TRUE,
+                               nboot = 2000)
+
+print(pattc_neural_boot)
+
 }
 
 }
