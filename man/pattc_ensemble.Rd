@@ -10,7 +10,8 @@ pattc_ensemble(
   pop.data,
   treat.var,
   compl.var,
-  SL.library = c("SL.glmnet", "SL.xgboost", "SL.ranger", "SL.nnet", "SL.glm"),
+  compl.SL.learners = c("SL.glmnet", "SL.xgboost", "SL.ranger", "SL.nnet", "SL.glm"),
+  response.SL.learners = c("SL.glmnet", "SL.xgboost", "SL.ranger", "SL.nnet", "SL.glm"),
   ID = NULL,
   cluster = NULL,
   binary.outcome = FALSE,
@@ -32,11 +33,15 @@ binary compliance variable.}
 
 \item{compl.var}{string for binary compliance variable.}
 
-\item{SL.library}{vector of names of ML algorithms used for ensemble model.}
+\item{compl.SL.learners}{vector of names of ML algorithms used for compliance
+model.}
 
-\item{ID}{string for name of identifier.}
+\item{response.SL.learners}{vector of names of ML algorithms used for response
+model.}
 
-\item{cluster}{string for name of cluster variable.}
+\item{ID}{string for name of identifier. (currently not used)}
+
+\item{cluster}{string for name of cluster variable. (currently not used)}
 
 \item{binary.outcome}{logical specifying predicted outcome variable will take
 binary values or proportions.}
@@ -47,7 +52,7 @@ binary values or proportions.}
 \code{bootstrap = FALSE}}
 }
 \value{
-results of t test as PATTC estimate.
+\code{pattc_ensemble} object of results of t test as PATTC estimate.
 }
 \description{
 \code{pattc_ensemble} estimates the Population Average Treatment Effect
@@ -71,7 +76,8 @@ pattc <- pattc_ensemble(response.formula = support_war ~ age + income +
                                 pop.data = pop_data,
                                 treat.var = "strong_leader",
                                 compl.var = "compliance",
-                                SL.library = c("SL.glm", "SL.nnet"),
+                                compl.SL.learners = c("SL.glm", "SL.nnet"),
+                                response.SL.learners = c("SL.glm", "SL.nnet"),
                                 ID = NULL,
                                 cluster = NULL,
                                 binary.outcome = FALSE)
@@ -84,7 +90,8 @@ pattc_boot <- pattc_ensemble(response.formula = support_war ~ age + income +
                                 pop.data = pop_data,
                                 treat.var = "strong_leader",
                                 compl.var = "compliance",
-                                SL.library = c("SL.glm", "SL.nnet"),
+                                compl.SL.learners = c("SL.glm", "SL.nnet"),
+                                response.SL.learners = c("SL.glm", "SL.nnet"),
                                 ID = NULL,
                                 cluster = NULL,
                                 binary.outcome = FALSE,

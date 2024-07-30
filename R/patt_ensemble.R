@@ -9,7 +9,7 @@
 #' complier variable and covariates
 #' @param treat.var string specifying the binary treatment variable
 #' @param ID string for name of indentifier variable.
-#' @param SL.library vector of strings for ML classifier algorithms. If left
+#' @param SL.learners vector of strings for ML classifier algorithms. If left
 #' `NULL` employs extreme gradient boosting, elastic net regression, random
 #' forest, and neural nets.
 #'
@@ -20,7 +20,7 @@ complier_mod <- function(exp.data,
                          complier.formula,
                          treat.var,
                          ID = NULL,
-                         SL.library = c("SL.glmnet", "SL.xgboost",
+                         SL.learners = c("SL.glmnet", "SL.xgboost",
                                         "SL.ranger", "SL.nnet",
                                         "SL.glm")) {
   if (!is.null(ID)){
@@ -36,7 +36,7 @@ complier_mod <- function(exp.data,
 
   complier.mod <- SuperLearner::SuperLearner(Y = Ycompl,
                                              X = Xcompl,
-                                             SL.library = SL.library,
+                                             SL.library = SL.learners,
                                              id = ID,
                                              family = "binomial")
   return(complier.mod)
@@ -93,7 +93,7 @@ complier_predict <- function(complier.mod,
 #' \code{complier_predict}.
 #' @param family string for `"gaussian"` or `"binomial"`.
 #' @param ID string for identifier variable.
-#' @param SL.library vector of names of ML algorithms used for ensemble model.
+#' @param SL.learners vector of names of ML algorithms used for ensemble model.
 #'
 #' @return trained response model.
 #' @export
@@ -104,7 +104,7 @@ response_model <- function(response.formula,
                          exp.compliers,
                          family = "binomial",
                          ID = NULL,
-                         SL.library = c("SL.glmnet", "SL.xgboost",
+                         SL.learners = c("SL.glmnet", "SL.xgboost",
                                         "SL.ranger", "SL.nnet",
                                         "SL.glm")){
 
@@ -126,7 +126,7 @@ response_model <- function(response.formula,
 
   response.mod <- SuperLearner::SuperLearner(Y = Y.exp.response,
                                X = X.exp.response,
-                               SL.library = SL.library,
+                               SL.library = SL.learners,
                                family = family,
                                id = ID)
   return(response.mod)
@@ -203,16 +203,19 @@ pattc_counterfactuals<- function (pop.data,
 #' binary compliance variable.
 #' @param treat.var string for binary treatment variable.
 #' @param compl.var string for binary compliance variable.
-#' @param ID string for name of identifier.
-#' @param cluster string for name of cluster variable.
-#' @param SL.library vector of names of ML algorithms used for ensemble model.
+#' @param ID string for name of identifier. (currently not used)
+#' @param cluster string for name of cluster variable. (currently not used)
 #' @param binary.outcome logical specifying predicted outcome variable will take
 #' binary values or proportions.
 #' @param bootstrap logical for bootstrapped PATT-C.
 #' @param nboot number of bootstrapped samples. Only used with
 #' `bootstrap = FALSE`
+#' @param compl.SL.learners vector of names of ML algorithms used for compliance
+#' model.
+#' @param response.SL.learners vector of names of ML algorithms used for response
+#' model.
 #'
-#' @return results of t test as PATTC estimate.
+#' @return `pattc_ensemble` object of results of t test as PATTC estimate.
 #' @export
 #'
 #' @examples
@@ -231,7 +234,8 @@ pattc_counterfactuals<- function (pop.data,
 #'                                 pop.data = pop_data,
 #'                                 treat.var = "strong_leader",
 #'                                 compl.var = "compliance",
-#'                                 SL.library = c("SL.glm", "SL.nnet"),
+#'                                 compl.SL.learners = c("SL.glm", "SL.nnet"),
+#'                                 response.SL.learners = c("SL.glm", "SL.nnet"),
 #'                                 ID = NULL,
 #'                                 cluster = NULL,
 #'                                 binary.outcome = FALSE)
@@ -244,7 +248,8 @@ pattc_counterfactuals<- function (pop.data,
 #'                                 pop.data = pop_data,
 #'                                 treat.var = "strong_leader",
 #'                                 compl.var = "compliance",
-#'                                 SL.library = c("SL.glm", "SL.nnet"),
+#'                                 compl.SL.learners = c("SL.glm", "SL.nnet"),
+#'                                 response.SL.learners = c("SL.glm", "SL.nnet"),
 #'                                 ID = NULL,
 #'                                 cluster = NULL,
 #'                                 binary.outcome = FALSE,
@@ -259,9 +264,12 @@ pattc_ensemble <- function(response.formula,
                         pop.data,
                         treat.var,
                         compl.var,
-                        SL.library = c("SL.glmnet", "SL.xgboost",
+                        compl.SL.learners = c("SL.glmnet", "SL.xgboost",
                                        "SL.ranger", "SL.nnet",
                                        "SL.glm"),
+                        response.SL.learners = c("SL.glmnet", "SL.xgboost",
+                                        "SL.ranger", "SL.nnet",
+                                        "SL.glm"),
                         ID = NULL,
                         cluster = NULL,
                         binary.outcome = FALSE,
@@ -276,6 +284,7 @@ pattc_ensemble <- function(response.formula,
 
   pop_data <- popcall(response.formula,
                       compl.var = compl.var,
+                      treat.var = treat.var,
                       pop.data = pop.data,
                       ID = ID)
 
@@ -289,7 +298,7 @@ pattc_ensemble <- function(response.formula,
                             treat.var = treat.var,
                             complier.formula = compl.formula,
                             ID = NULL,
-                            SL.library = SL.library)
+                            SL.learners = compl.SL.learners)
 
   compliers <- complier_predict(complier.mod = compl.mod,
                                 compl.var = compl.var,
@@ -303,7 +312,7 @@ pattc_ensemble <- function(response.formula,
                                   compl.var = compl.var,
                                   family = "binomial",
                                   ID = NULL,
-                                  SL.library = SL.library)
+                                  SL.learners = response.SL.learners)
 
   message("Predicting response and estimating PATT-C")
   counterfactuals <- pattc_counterfactuals(pop.data = pop_data,
@@ -349,7 +358,7 @@ pattc_ensemble <- function(response.formula,
       results <- c(bootPATTC, quantile(bootout[,3], c(0.025, 0.975)))
       names(results) <- c("PATT-C", "LCI (2.5%)", "UCI (2.5%)")
       method <- paste0("Bootstrapped PATT-C with ", nboot," samples")
-      boot.out <- list(method, results)
+      boot.out <- list(results, method)
       pattc <- boot.out
     } else if (!bootstrap){
       pattc_t <- t.test(x = counterfactuals$Y_hat1,
@@ -369,14 +378,15 @@ pattc_ensemble <- function(response.formula,
   model.out<-list("formula" = response.formula,
                   "treat_var" = treat.var,
                   "compl_var" =  compl.var,
-                  "SL_library" =  SL.library,
+                  "compl_SL_library" =  compl.SL.learners,
+                  "response_SL_library" =  response.SL.learners,
                   "exp_data" = exp_data$exp_data,
                   "pop_data" = pop_data$pop_data,
                   "complier_prediction" = compliers,
                   "pop_counterfactual" = counterfactuals,
                   "PATT_C" = pattc)
 
-  class(model.out)<-"pattc_ensemble"
+  class(model.out) <- "pattc_ensemble"
   return(model.out)
 }
 
@@ -401,11 +411,8 @@ print.pattc_ensemble <- function(x, ...){
   cat("\n")
   cat("Compliance Variable: ", x$compl_var)
   cat("\n")
-  cat("SL Algorithms:\n")
-  cat(x$SL_library)
-  cat("\n")
   cat("Estimate:\n")
-  cat(x$PATT_C[[1]])
+  print(x$PATT_C[[1]])
   cat("\n")
   cat(x$PATT_C[[2]])
 }

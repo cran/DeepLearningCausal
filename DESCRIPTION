@@ -1,7 +1,7 @@
 Package: DeepLearningCausal
 Type: Package
 Title: Causal Inference with Super Learner and Deep Neural Networks
-Version: 0.0.103
+Version: 0.0.104
 Authors@R: c(person(given = "Nguyen K.",
                     family = "Huynh",
                     email = "khoinguyen.huynh@r.hit-u.ac.jp",
@@ -41,9 +41,9 @@ Depends: R (>= 4.1.0)
 URL: https://github.com/hknd23/DeepLearningCausal
 BugReports: https://github.com/hknd23/DeepLearningCausal/issues
 NeedsCompilation: no
-Packaged: 2024-07-01 14:54:47 UTC; nguye
+Packaged: 2024-07-29 23:49:32 UTC; nguye
 Author: Nguyen K. Huynh [aut, cre] (<https://orcid.org/0000-0002-6234-7232>),
   Bumba Mukherjee [aut] (<https://orcid.org/0000-0002-3453-601X>),
   Irvin (Chen-Yu) Lee [aut] (<https://orcid.org/0009-0004-5913-8925>)
 Repository: CRAN
-Date/Publication: 2024-07-01 15:10:02 UTC
+Date/Publication: 2024-07-30 00:10:02 UTC

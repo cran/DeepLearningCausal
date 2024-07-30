@@ -220,7 +220,7 @@ neuralnet_pattc_counterfactuals <- function (pop.data,
 #' @param bootstrap logical for bootstrapped PATT-C.
 #' @param nboot number of bootstrapped samples
 #'
-#' @return results of t test as PATTC estimate.
+#' @return `pattc_deepneural` class object of results of t test as PATTC estimate.
 #' @export
 #'
 #' @examples
@@ -298,6 +298,7 @@ pattc_deepneural <- function(response.formula,
 
   popdata <-popcall(response.formula,
                     compl.var = compl.var,
+                    treat.var = treat.var,
                     pop.data = pop.data,
                     ID = ID)
 
@@ -367,7 +368,7 @@ pattc_deepneural <- function(response.formula,
       results <- c(bootPATTC, quantile(bootout[,3], c(0.025, 0.975)))
       names(results) <- c("PATT-C", "LCI (2.5%)", "UCI (2.5%)")
       method <- paste0("Bootstrapped PATT-C with ", nboot," samples")
-      boot.out <- list(method, results)
+      boot.out <- list(results, method)
       pattc <- boot.out
     } else if (!bootstrap){
       pattc_t <- t.test(x = counterfactuals$Y_hat1,
@@ -413,7 +414,7 @@ pattc_deepneural <- function(response.formula,
 #' @export
 #'
 
-print.pattc_ensemble <- function(x, ...){
+print.pattc_deepneural <- function(x, ...){
   cat("Method:\n")
   cat("Deep Neural PATT-C\n")
   cat("Formula:\n")
@@ -423,16 +424,8 @@ print.pattc_ensemble <- function(x, ...){
   cat("\n")
   cat("Compliance Variable: ", x$compl_var)
   cat("\n")
-  cat("Neural Network Algorithm:\n")
-  cat("Compliance Model: ",x$compl_algorithm)
-  cat("; Response Model: ",x$response_algorithm)
-  cat("\n")
-  cat("Hidden Layers:\n")
-  cat("Compliance Model: ",x$compl_hidden_layer)
-  cat("; Response Model: ",x$response_hidden_layer)
-  cat("\n")
   cat("Estimate:\n")
-  cat(x$PATT_C[[1]])
+  print(x$PATT_C[[1]])
   cat("\n")
   cat(x$PATT_C[[2]])
 }

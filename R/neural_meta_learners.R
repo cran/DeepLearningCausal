@@ -22,8 +22,8 @@
 #' @param binary.outcome logical specifying predicted outcome variable will take
 #' binary values or proportions.
 #'
-#' @return `list` of predicted outcome values and CATEs estimated by the meta
-#' learners for each observation.#' @export
+#' @return `metalearner_deepneural` of predicted outcome values and CATEs estimated by the meta
+#' learners for each observation.
 #' @export
 #'
 #' @examples
@@ -164,10 +164,15 @@ metalearner_deepneural <- function(data,
       Y_hats <- data.frame("Y_hat0" = Y_hat_test_0,
                            "Y_hat1" = Y_hat_test_1)
 
-      learner_out <- list("CATEs" = score_meta,
+      learner_out <- list("formula" = cov.formula,
+                          "treat_var" = treat.var,
+                          "algorithm" = algorithm,
+                          "hidden_layer" = hidden.layer,
+                          "CATEs" = score_meta,
                           "Y_hats" = Y_hats,
                           "Meta_Learner" = meta.learner.type,
-                          "ml_model" = m_mod)
+                          "ml_model" = m_mod,
+                          "data" = data)
     }
     if(meta.learner.type == "T.Learner"){
 
@@ -215,7 +220,8 @@ metalearner_deepneural <- function(data,
                           "Y_hats" = Y_hats,
                           "Meta_Learner" = meta.learner.type,
                           "ml_model1" = m1_mod,
-                          "ml_model0" = m0_mod)
+                          "ml_model0" = m0_mod,
+                          "data" = data)
     }
     Sys.sleep(.05)
     setTxtProgressBar(pb, f)
@@ -236,18 +242,14 @@ metalearner_deepneural <- function(data,
 #' @export
 #'
 
-print.pattc_ensemble <- function(x, ...){
+print.metalearner_deepneural <- function(x, ...){
   cat("Method:\n")
-  cat("Ensemble Meta Learner\n")
-  cat(x$Meta_Learner)
+  cat("Deep Neural ", x$Meta_Learner)
+  cat("\n")
   cat("Formula:\n")
   cat(deparse(x$formula))
   cat("\n")
   cat("Treatment Variable: ", x$treat_var)
-  cat("\n")
-  cat("Neural Network Algorithm: ",x$algorithm)
-  cat("\n")
-  cat("Hidden Layers: ",x$hidden_layer)
   cat("\n")
   cat("CATEs percentiles:\n")
   print(quantile(x$CATEs, c(.10 ,.25, .50 ,.75, .90)))

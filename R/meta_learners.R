@@ -12,14 +12,14 @@
 #' @param treat.var string for the name of treatment variable.
 #' @param meta.learner.type string specifying is the S-learner and
 #' \code{"T.Learner"} for the T-learner model.
-#' @param learners vector for super learner ensemble that includes extreme gradient
+#' @param SL.learners vector for super learner ensemble that includes extreme gradient
 #' boosting, glmnet, random forest, and neural nets.
 #' @param nfolds number of folds for cross-validation. Currently supports up to
 #' 5 folds.
 #' @param binary.outcome logical specifying predicted outcome variable will take
 #' binary values or proportions.
 #'
-#' @return `list` of predicted outcome values and CATEs estimated by the meta
+#' @return `metalearner_ensemble` of predicted outcome values and CATEs estimated by the meta
 #' learners for each observation.
 #' @export
 #'
@@ -35,7 +35,7 @@
 #'                                 data = exp_data,
 #'                                 treat.var = "strong_leader",
 #'                                 meta.learner.type = "S.Learner",
-#'                                 learners = c("SL.glm"),
+#'                                 SL.learners = c("SL.glm"),
 #'                                 nfolds = 5,
 #'                                 binary.outcome = FALSE)
 #' print(slearner)
@@ -48,7 +48,7 @@
 #'                                   data = exp_data,
 #'                                   treat.var = "strong_leader",
 #'                                   meta.learner.type = "T.Learner",
-#'                                   learners = c("SL.xgboost","SL.ranger",
+#'                                   SL.learners = c("SL.xgboost","SL.ranger",
 #'                                                "SL.nnet"),
 #'                                   nfolds = 5,
 #'                                   binary.outcome = FALSE)
@@ -60,7 +60,7 @@ metalearner_ensemble <- function(data,
                                 cov.formula,
                                 treat.var,
                                 meta.learner.type,
-                                learners = c("SL.glmnet", "SL.xgboost",
+                                SL.learners = c("SL.glmnet", "SL.xgboost",
                                            "SL.ranger", "SL.nnet"),
                                 nfolds = 5,
                                 binary.outcome = FALSE)
@@ -124,7 +124,7 @@ metalearner_ensemble <- function(data,
     X_train <- (df_aux[,c(covariates,"d")])
 
     m_mod <- SuperLearner::SuperLearner(Y = df_aux$y, X = X_train,
-                                        SL.library = learners,
+                                        SL.library = SL.learners,
                                         verbose = FALSE,
                                         method = "method.NNLS",
                                         family = "binomial",
@@ -172,11 +172,14 @@ metalearner_ensemble <- function(data,
     Y_hats <- data.frame("Y_hat0" = Y_hat_test_0,
                          "Y_hat1" = Y_hat_test_1)
 
-    learner_out <- list("CATEs" = score_meta,
+    learner_out <- list("formula" = cov.formula,
+                        "treat_var" = treat.var,
+                        "CATEs" = score_meta,
                         "Y_hats" = Y_hats,
                         "Meta_Learner" = meta.learner.type,
-                        "ml_model" = m_mod)
-
+                        "ml_model" = m_mod,
+                        "SL_learners" = SL.learners,
+                        "data" = data)
     }
 
     if(meta.learner.type == "T.Learner"){
@@ -186,7 +189,7 @@ metalearner_ensemble <- function(data,
 
     m1_mod <- SuperLearner::SuperLearner(Y = aux_1$y, X = aux_1[,covariates],
                                          newX = df_main[,covariates],
-                                         SL.library = learners,
+                                         SL.library = SL.learners,
                                          verbose = FALSE,
                                          method = "method.NNLS",
                                          family = "binomial",
@@ -194,7 +197,7 @@ metalearner_ensemble <- function(data,
 
     m0_mod <- SuperLearner::SuperLearner(Y = aux_0$y, X = aux_0[,covariates],
                                          newX = df_main[,covariates],
-                                         SL.library = learners,
+                                         SL.library = SL.learners,
                                          verbose = FALSE,
                                          method = "method.NNLS",
                                          family = "binomial",
@@ -241,7 +244,8 @@ metalearner_ensemble <- function(data,
                         "Meta_Learner" = meta.learner.type,
                         "ml_model1" = m1_mod,
                         "ml_model0" = m0_mod,
-                        "learners" = learners)}
+                        "SL_learners" = SL.learners,
+                        "data" = data)}
     Sys.sleep(.05)
     setTxtProgressBar(pb, f)
     }
@@ -262,17 +266,14 @@ metalearner_ensemble <- function(data,
 #' @export
 #'
 
-print.pattc_ensemble <- function(x, ...){
+print.metalearner_ensemble <- function(x, ...){
   cat("Method:\n")
-  cat("Ensemble Meta Learner\n")
-  cat(x$Meta_Learner)
+  cat("Ensemble ", x$Meta_Learner)
+  cat("\n")
   cat("Formula:\n")
   cat(deparse(x$formula))
   cat("\n")
   cat("Treatment Variable: ", x$treat_var)
-  cat("\n")
-  cat("SL Algorithms:\n")
-  cat(x$learners)
   cat("\n")
   cat("CATEs percentiles:\n")
   print(quantile(x$CATEs, c(.10 ,.25, .50 ,.75, .90)))
