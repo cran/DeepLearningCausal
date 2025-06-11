@@ -90,6 +90,24 @@ tlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
                                   binary.outcome = FALSE)
 
 print(tlearner_nn)
+
+# load dataset
+set.seed(123456)
+# estimate CATEs with X Learner
+xlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
+                                  income  +
+                                  employed  + job_loss,
+                                  data = exp_data,
+                                  treat.var = "strong_leader",
+                                  meta.learner.type = "X.Learner",
+                                  stepmax = 2e+9,
+                                  nfolds = 5,
+                                  algorithm = "rprop+",
+                                  hidden.layer = c(3),
+                                  linear.output = FALSE,
+                                  binary.outcome = FALSE)
+
+print(xlearner_nn)
                                   }
 
 }
