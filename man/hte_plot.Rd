@@ -11,12 +11,13 @@ hte_plot(
   n_boot = 1000,
   cut_points = NULL,
   custom_labels = NULL,
-  zero_int = TRUE
+  zero_int = TRUE,
+  selected_vars = NULL
 )
 }
 \arguments{
 \item{x}{estimated model from \code{metalearner_ensemble},
-\code{metalearner_deepneural}, \code{pattc_ensemble}, or \code{pattc_neural}.}
+\code{metalearner_neural}, \code{pattc_ensemble}, or \code{pattc_neural}.}
 
 \item{...}{Additional arguments}
 
@@ -30,6 +31,8 @@ covariates. If left blank a vector generated from median values will be used.}
 \item{custom_labels}{character vector for the names of subgroups.}
 
 \item{zero_int}{logical for vertical line at 0 x intercept.}
+
+\item{selected_vars}{vector for names of covariates to use for subgroups.}
 }
 \value{
 \code{ggplot} object illustrating subgroup HTE and 95\% confidence
@@ -38,14 +41,14 @@ intervals.
 \description{
 Produces plot to illustrate sub-group Heterogeneous Treatment Effects (HTE)
 of estimated CATEs from \code{metalearner_ensemble} and
-\code{metalearner_deepneural}, as well as PATT-C from \code{pattc_ensemble}
+\code{metalearner_neural}, as well as PATT-C from \code{pattc_ensemble}
 and \code{pattc_neural}.
 }
 \examples{
 \donttest{
 # load dataset
 set.seed(123456)
-xlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
+xlearner_nn <- metalearner_neural(cov.formula = support_war ~ age +
                                   income  + employed  + job_loss,
                                   data = exp_data,
                                   treat.var = "strong_leader",
@@ -55,9 +58,13 @@ xlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
                                   algorithm = "rprop+",
                                   hidden.layer = c(3),
                                   linear.output = FALSE,
-                                  binary.outcome = FALSE)
+                                  binary.preds = FALSE)
 
 hte_plot(xlearner_nn)
+hte_plot(xlearner_nn,
+        selected_vars = c("age", "income"),
+        cut_points = c(33, 3),
+        custom_labels = c("Age <= 33", "Age > 33", "Income <= 3", "Income > 3"),
+        n_boot = 500)
                                   }
-                    
 }

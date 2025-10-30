@@ -1,7 +1,7 @@
-#' metalearner_deepneural
+#' metalearner_neural
 #'
 #' @description
-#' \code{metalearner_deepneural} implements the S-learner and T-learner for estimating
+#' \code{metalearner_neural} implements the S-learner and T-learner for estimating
 #' CATE using Deep Neural Networks. The Resilient back propagation (Rprop)
 #' algorithm is used for training neural networks.
 #'
@@ -10,6 +10,8 @@
 #' @param treat.var string for the name of treatment variable.
 #' @param meta.learner.type string specifying is the S-learner and
 #' \code{"T.Learner"} for the T-learner model.
+#' \code{"X.Learner"} for the X-learner model.
+#' \code{"R.Learner"} for the R-learner model.
 #' @param stepmax maximum number of steps for training model.
 #' @param nfolds number of folds for cross-validation. Currently supports up to
 #' 5 folds.
@@ -19,10 +21,11 @@
 #' @param hidden.layer vector of integers specifying layers and number of neurons.
 #' @param linear.output logical specifying regression (TRUE)
 #' or classification (FALSE) model.
-#' @param binary.outcome logical specifying predicted outcome variable will take
+#' @param binary.preds logical specifying predicted outcome variable will take
 #' binary values or proportions.
-#'
-#' @return `metalearner_deepneural` of predicted outcome values and CATEs estimated by the meta
+#' @param act.fct "logistic" or "tanh" for activation function to be used in the neural network. 
+#' @param err.fct "ce" for cross-entropy or "sse" for sum of squared errors as error function.
+#' @return `metalearner_neural` of predicted outcome values and CATEs estimated by the meta
 #' learners for each observation.
 #' @export
 #'
@@ -32,7 +35,7 @@
 #' data(exp_data)
 #' # estimate CATEs with S Learner
 #' set.seed(123456)
-#' slearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age + income +
+#' slearner_nn <- metalearner_neural(cov.formula = support_war ~ age + income +
 #'                                    employed  + job_loss,
 #'                                    data = exp_data,
 #'                                    treat.var = "strong_leader",
@@ -42,14 +45,15 @@
 #'                                    algorithm = "rprop+",
 #'                                    hidden.layer = c(1),
 #'                                    linear.output = FALSE,
-#'                                    binary.outcome = FALSE)
+#'                                    binary.preds = FALSE)
 #'
 #' print(slearner_nn)
-#'
+#' }
+#' \donttest{
 #' # load dataset
 #' set.seed(123456)
 #' # estimate CATEs with T Learner
-#' tlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
+#' tlearner_nn <- metalearner_neural(cov.formula = support_war ~ age +
 #'                                   income  +
 #'                                   employed  + job_loss,
 #'                                   data = exp_data,
@@ -60,14 +64,16 @@
 #'                                   algorithm = "rprop+",
 #'                                   hidden.layer = c(2,1),
 #'                                   linear.output = FALSE,
-#'                                   binary.outcome = FALSE)
+#'                                   binary.preds = FALSE)
 #'
 #' print(tlearner_nn)
-#'
+#' }
+#' 
+#' \donttest{
 #' # load dataset
 #' set.seed(123456)
 #' # estimate CATEs with X Learner
-#' xlearner_nn <- metalearner_deepneural(cov.formula = support_war ~ age +
+#' xlearner_nn <- metalearner_neural(cov.formula = support_war ~ age +
 #'                                   income  +
 #'                                   employed  + job_loss,
 #'                                   data = exp_data,
@@ -78,13 +84,13 @@
 #'                                   algorithm = "rprop+",
 #'                                   hidden.layer = c(3),
 #'                                   linear.output = FALSE,
-#'                                   binary.outcome = FALSE)
+#'                                   binary.preds = FALSE)
 #'
 #' print(xlearner_nn)
 #'                                   }
 #'
 
-metalearner_deepneural <- function(data,
+metalearner_neural <- function(data,
                                    cov.formula,
                                    treat.var,
                                    meta.learner.type,
@@ -92,13 +98,18 @@ metalearner_deepneural <- function(data,
                                    nfolds = 5,
                                    algorithm = "rprop+",
                                    hidden.layer = c(4,2),
-                                   linear.output = FALSE,
-                                   binary.outcome = FALSE)
+                                   act.fct = "logistic",
+                                   err.fct = "sse",
+                                   linear.output = TRUE,
+                                   binary.preds = FALSE)
 {
-  if(meta.learner.type %in% c("S.Learner", "T.Learner", 
-                              "X.Learner", "R.Learner") == FALSE)
-  {
-    stop("Meta Learner not supported")
+  if (err.fct == "ce" & linear.output == TRUE){
+    stop("cross-entropy error function cannot be used with linear output.
+         Please set linear.output = FALSE")
+  }
+  if(!(meta.learner.type %in% c("S.Learner", "T.Learner", 
+                                "X.Learner", "R.Learner"))){
+    stop("Please specify valid meta learner type of 'S.Learner', 'T.Learner', 'X.Learner' or 'R.Learner'")
   }
 
   cov.formula <- as.formula(cov.formula)
@@ -158,7 +169,9 @@ metalearner_deepneural <- function(data,
                                       data = df_aux,
                                       hidden = hidden.layer,
                                       algorithm = algorithm,
-                                      linear.output = FALSE,
+                                      linear.output = linear.output,
+                                      act.fct = act.fct,
+                                      err.fct = err.fct,
                                       stepmax = stepmax)
         
         # Set treatment variable to 0
@@ -172,10 +185,10 @@ metalearner_deepneural <- function(data,
         Y_test_1 <- predict(m_mod,X_test_1)
         Y_test_0 <- predict(m_mod,X_test_0)
         
-        if (binary.outcome) {
+        if (binary.preds) {
           Y_hat_test_1 <- max.col(Y_test_1) - 1
           Y_hat_test_0 <- max.col(Y_test_0) - 1
-        } else if (!binary.outcome) {
+        } else if (!binary.preds) {
           Y_hat_test_1 <- Y_test_1
           Y_hat_test_0 <- Y_test_0
         }
@@ -204,23 +217,27 @@ metalearner_deepneural <- function(data,
                                        data = aux_1,
                                        hidden = hidden.layer,
                                        algorithm = algorithm,
-                                       linear.output = FALSE,
+                                       linear.output = linear.output,
+                                       act.fct = act.fct,
+                                       err.fct = err.fct,
                                        stepmax = stepmax)
         
         m0_mod <- neuralnet::neuralnet(s.formula,
                                        data = aux_0,
                                        hidden = hidden.layer,
                                        algorithm = algorithm,
-                                       linear.output = FALSE,
+                                       linear.output = linear.output,
+                                       act.fct = act.fct,
+                                       err.fct = err.fct,
                                        stepmax = stepmax)
         
         Y_test_0 <- predict(m0_mod, df_main)
         Y_test_1 <- predict(m1_mod, df_main)
         
-        if (binary.outcome) {
+        if (binary.preds) {
           Y_hat_test_1 <- max.col(Y_test_1) - 1
           Y_hat_test_0 <- max.col(Y_test_0) - 1
-        } else if (!binary.outcome) {
+        } else if (!binary.preds) {
           Y_hat_test_1 <- Y_test_1
           Y_hat_test_0 <- Y_test_0
         }
@@ -279,6 +296,7 @@ metalearner_deepneural <- function(data,
       s.formula <- paste0("d ~ ", paste0(covariates, collapse = " + "))
       p_mod <- neuralnet::neuralnet(s.formula, data = df_aux, hidden = 3,
                                     algorithm = algorithm, 
+                                    act.fct = act.fct,
                                     linear.output = FALSE, 
                                     stepmax = stepmax)
       p_hat <- predict(p_mod, df_main[, covariates])
@@ -292,13 +310,17 @@ metalearner_deepneural <- function(data,
                                      data = aux_1, 
                                      hidden = hidden.layer, 
                                      algorithm = algorithm, 
-                                     linear.output = FALSE, 
+                                     linear.output = linear.output, 
+                                     act.fct = act.fct,
+                                     err.fct = err.fct,
                                      stepmax = stepmax)
       m0_mod <- neuralnet::neuralnet(s.formula, 
                                      data = aux_0, 
                                      hidden = hidden.layer, 
                                      algorithm = algorithm, 
-                                     linear.output = FALSE, 
+                                     linear.output = linear.output, 
+                                     act.fct = act.fct,
+                                     err.fct = err.fct,
                                      stepmax = stepmax)
       
       m1_hat <- predict(m1_mod, df_main[, covariates])
@@ -336,12 +358,13 @@ metalearner_deepneural <- function(data,
                                        data = train_data1,
                                        hidden = hidden.layer,
                                        algorithm = algorithm,
-                                       linear.output = FALSE,
+                                       linear.output = linear.output,
+                                       act.fct = act.fct,
+                                       err.fct = err.fct,
                                        stepmax = stepmax)
       score_tau1 <- predict(tau1_mod, data[, covariates])
       a1 <- score_tau1
-    },error=function(e){
-      
+    }, error = function(e){
       mean_score <- mean(pseudo_all[,1])
       score_tau1 <- rep.int(mean_score, times = nrow(data))
       a1 <- score_tau1
@@ -355,7 +378,9 @@ metalearner_deepneural <- function(data,
                                        data = train_data0,
                                        hidden = hidden.layer,
                                        algorithm = algorithm,
-                                       linear.output = FALSE,
+                                       linear.output = linear.output,
+                                       act.fct = act.fct,
+                                       err.fct = err.fct,
                                        stepmax = stepmax)
       score_tau0 <- predict(tau0_mod, data[, covariates])
       a0 <- score_tau0
@@ -426,7 +451,8 @@ metalearner_deepneural <- function(data,
       s.formula <- paste0("d ~ ", paste0(covariates, collapse = " + "))
       p_mod <- neuralnet::neuralnet(s.formula, data = df_aux, hidden = 3,
                                     algorithm = algorithm, 
-                                    linear.output = TRUE, 
+                                    act.fct = act.fct,
+                                    linear.output = FALSE, 
                                     stepmax = stepmax)
       p_hat <- predict(p_mod, df_main[, covariates])
       p_hat <- ifelse(p_hat < 0.025, 0.025, 
@@ -436,7 +462,9 @@ metalearner_deepneural <- function(data,
       m_mod <- neuralnet::neuralnet(s.formula, data = df_aux, 
                                     hidden = hidden.layer,
                                     algorithm = algorithm, 
-                                    linear.output = FALSE, 
+                                    linear.output = linear.output, 
+                                    act.fct = act.fct,
+                                    err.fct = err.fct,
                                     stepmax = stepmax)
       
       m_hat <- predict(m_mod, df_main[, covariates])
@@ -467,16 +495,18 @@ metalearner_deepneural <- function(data,
     set_data <- split(r_mod_data, cut(1:nrow(r_mod_data), breaks = 10))
     set_data_weighted <- lapply(set_data,
                                 function(x) tidyr::uncount(x, 
-                                                           weights = obs_weight))
+                                                           weights = .data$obs_weight))
     
     set_index <- split(1:nrow(data), cut(1:nrow(data), breaks = 10))
     
     for(l in 1:10){
       if(l <= 5){
-        r_mod_cf <- neuralnet::neuralnet(s.formula, data = set_data_weighted[[l]], 
+        r_mod_cf <- neuralnet::neuralnet(r.formula, data = set_data_weighted[[l]], 
                                          hidden = hidden.layer,
                                          algorithm = algorithm, 
-                                         linear.output = FALSE,
+                                         linear.output = linear.output,
+                                         act.fct = act.fct,
+                                         err.fct = err.fct,
                                          stepmax = stepmax)
         
         score_r_1_cf <- predict(r_mod_cf, 
@@ -484,11 +514,13 @@ metalearner_deepneural <- function(data,
         res_combined_r[unlist(set_index[6:10]), l] <- score_r_1_cf
       }
       if(l  > 5){
-        r_mod_cf <- neuralnet::neuralnet(s.formula, 
+        r_mod_cf <- neuralnet::neuralnet(r.formula, 
                                          data = set_data_weighted[[l]], 
                                          hidden = hidden.layer,
                                          algorithm = algorithm, 
-                                         linear.output = FALSE,
+                                         linear.output = linear.output,
+                                         act.fct = act.fct,
+                                         err.fct = err.fct,
                                          stepmax = stepmax)
 
         score_r_0_cf <- predict(r_mod_cf, 
@@ -508,22 +540,22 @@ metalearner_deepneural <- function(data,
                         "hidden_layer" = hidden.layer,
                         "data" = data)
   }
-  class(learner_out) <- "metalearner_deepneural"
+  class(learner_out) <- "metalearner_neural"
   return(learner_out)
 }
 
-#' print.metalearner_deepneural
+#' print.metalearner_neural
 #'
 #' @description
-#' Print method for \code{metalearner_deepneural}
-#' @param x `metalearner_deepneural` class object from \code{metalearner_deepneural}
+#' Print method for \code{metalearner_neural}
+#' @param x `metalearner_neural` class object from \code{metalearner_neural}
 #' @param ... additional parameter
 #'
 #' @return list of model results
 #' @export
 #'
 
-print.metalearner_deepneural <- function(x, ...){
+print.metalearner_neural <- function(x, ...){
   cat("Method:\n")
   cat("Deep Neural ", x$Meta_Learner)
   cat("\n")
@@ -535,3 +567,7 @@ print.metalearner_deepneural <- function(x, ...){
   cat("CATEs percentiles:\n")
   print(quantile(x$CATEs, c(.10 ,.25, .50 ,.75, .90)))
 }
+
+                                
+####### Remember to fix mmod R learner on 494
+

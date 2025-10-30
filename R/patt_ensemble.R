@@ -8,12 +8,12 @@
 #' @param complier.formula formula to fit compliance model (c ~ x) using
 #' complier variable and covariates
 #' @param treat.var string specifying the binary treatment variable
-#' @param ID string for name of indentifier variable.
-#' @param SL.learners vector of strings for ML classifier algorithms. If left
-#' `NULL` employs extreme gradient boosting, elastic net regression, random
-#' forest, and neural nets.
+#' @param ID string for name of identifier variable.
+#' @param SL.learners vector of strings for ML classifier algorithms. Defaults to
+#' extreme gradient boosting, elastic net regression, random forest, and neural nets.
 #'
 #' @return model object of trained model.
+#' @importFrom stats gaussian binomial
 #' @export
 
 complier_mod <- function(exp.data,
@@ -38,7 +38,7 @@ complier_mod <- function(exp.data,
                                              X = Xcompl,
                                              SL.library = SL.learners,
                                              id = ID,
-                                             family = "binomial")
+                                             family = binomial())
   return(complier.mod)
 }
 
@@ -91,18 +91,19 @@ complier_predict <- function(complier.mod,
 #' @param compl.var string specifying binary complier variable
 #' @param exp.compliers `data.frame` object of compliers from
 #' \code{complier_predict}.
-#' @param family string for `"gaussian"` or `"binomial"`.
+#' @param family gaussian() or binomial().
 #' @param ID string for identifier variable.
 #' @param SL.learners vector of names of ML algorithms used for ensemble model.
 #'
 #' @return trained response model.
+#' @importFrom stats gaussian binomial
 #' @export
 
 response_model <- function(response.formula,
                          exp.data,
                          compl.var,
                          exp.compliers,
-                         family = "binomial",
+                         family = gaussian(),
                          ID = NULL,
                          SL.learners = c("SL.glmnet", "SL.xgboost",
                                         "SL.ranger", "SL.nnet",
@@ -140,7 +141,7 @@ response_model <- function(response.formula,
 #'
 #' @param pop.data population dataset
 #' @param response.mod trained model from \code{response_model}.
-#' @param binary.outcome logical specifying whether predicted outcomes are
+#' @param binary.preds logical specifying whether predicted outcomes are
 #' proportions or binary (0-1).
 #' @param cluster string for clustering variable
 #' @param ID string fir identifier variable
@@ -152,7 +153,7 @@ pattc_counterfactuals<- function (pop.data,
                                   response.mod,
                                   ID = NULL,
                                   cluster = NULL,
-                                  binary.outcome = FALSE){
+                                  binary.preds = FALSE){
   compl.var <- pop.data$compl_var
   covariates <- all.vars(pop.data$response_formula)[-1]
   outcome <- all.vars(pop.data$response_formula)[1]
@@ -170,10 +171,10 @@ pattc_counterfactuals<- function (pop.data,
   Y.pred.1 <- predict(response.mod, pop.tr.counterfactual, onlySL = T)$pred
 
   Y.pred.0 <- predict(response.mod, pop.ctrl.counterfactual, onlySL = T)$pred
-  if (binary.outcome) {
+  if (binary.preds) {
     Y.hat.1 <- ifelse(Y.pred.1 > .5, 1, 0)
     Y.hat.0 <- ifelse(Y.pred.0 > .5, 1, 0)
-  } else if (!binary.outcome) {
+  } else if (!binary.preds) {
     Y.hat.1 <- Y.pred.1
     Y.hat.0 <- Y.pred.0
   }
@@ -187,7 +188,7 @@ pattc_counterfactuals<- function (pop.data,
   return(Y.hats)
 }
 
-#' PATT_C SL Ensemble
+#' PATT-C SL Ensemble
 #'
 #' @description
 #' \code{pattc_ensemble} estimates the Population Average Treatment Effect
@@ -205,7 +206,7 @@ pattc_counterfactuals<- function (pop.data,
 #' @param compl.var string for binary compliance variable.
 #' @param ID string for name of identifier. (currently not used)
 #' @param cluster string for name of cluster variable. (currently not used)
-#' @param binary.outcome logical specifying predicted outcome variable will take
+#' @param binary.preds logical specifying predicted outcome variable will take
 #' binary values or proportions.
 #' @param bootstrap logical for bootstrapped PATT-C.
 #' @param nboot number of bootstrapped samples. Only used with
@@ -214,8 +215,10 @@ pattc_counterfactuals<- function (pop.data,
 #' model.
 #' @param response.SL.learners vector of names of ML algorithms used for response
 #' model.
+#' @param response.family gaussian() or binomial() for response model.
 #'
 #' @return `pattc_ensemble` object of results of t test as PATTC estimate.
+#' @importFrom stats gaussian binomial
 #' @export
 #'
 #' @examples
@@ -228,19 +231,6 @@ pattc_counterfactuals<- function (pop.data,
 #' library(SuperLearner)
 #' set.seed(123456)
 #' #specify models and estimate PATTC
-#' pattc <- pattc_ensemble(response.formula = support_war ~ age + income +
-#'                                 education + employed + job_loss,
-#'                                 exp.data = exp_data_full,
-#'                                 pop.data = pop_data,
-#'                                 treat.var = "strong_leader",
-#'                                 compl.var = "compliance",
-#'                                 compl.SL.learners = c("SL.glm", "SL.nnet"),
-#'                                 response.SL.learners = c("SL.glm", "SL.nnet"),
-#'                                 ID = NULL,
-#'                                 cluster = NULL,
-#'                                 binary.outcome = FALSE)
-#'
-#' print(pattc)
 #'
 #' pattc_boot <- pattc_ensemble(response.formula = support_war ~ age + income +
 #'                                 education + employed + job_loss,
@@ -250,9 +240,10 @@ pattc_counterfactuals<- function (pop.data,
 #'                                 compl.var = "compliance",
 #'                                 compl.SL.learners = c("SL.glm", "SL.nnet"),
 #'                                 response.SL.learners = c("SL.glm", "SL.nnet"),
+#'                                 response.family = binomial(),
 #'                                 ID = NULL,
 #'                                 cluster = NULL,
-#'                                 binary.outcome = FALSE,
+#'                                 binary.preds = FALSE,
 #'                                 bootstrap = TRUE,
 #'                                 nboot = 1000)
 #' print(pattc_boot)
@@ -270,12 +261,17 @@ pattc_ensemble <- function(response.formula,
                         response.SL.learners = c("SL.glmnet", "SL.xgboost",
                                         "SL.ranger", "SL.nnet",
                                         "SL.glm"),
+                        response.family = gaussian(),
                         ID = NULL,
                         cluster = NULL,
-                        binary.outcome = FALSE,
+                        binary.preds = FALSE,
                         bootstrap = FALSE,
                         nboot = 1000){
 
+  if (response.family$family == "gaussian") {
+    binary.preds = FALSE
+  }
+  
   exp_data <- expcall(response.formula,
                       treat.var = treat.var,
                       compl.var = compl.var,
@@ -310,19 +306,19 @@ pattc_ensemble <- function(response.formula,
                                   exp.data = exp_data$exp_data,
                                   exp.compliers = compliers,
                                   compl.var = compl.var,
-                                  family = "binomial",
                                   ID = NULL,
-                                  SL.learners = response.SL.learners)
+                                  SL.learners = response.SL.learners,
+                                  family = response.family)
 
   message("Predicting response and estimating PATT-C")
   counterfactuals <- pattc_counterfactuals(pop.data = pop_data,
                                            response.mod = response.mod,
                                            ID = NULL,
                                            cluster = NULL,
-                                           binary.outcome = binary.outcome)
+                                           binary.preds = binary.preds)
 
   outcome.var <- all.vars(response.formula)[1]
-  if (binary.outcome) {
+  if (binary.preds) {
     Y_hat1_0s <- sum(counterfactuals$Y_hat0)
     nY_hat0 <- length(counterfactuals$Y_hat0)
     Y_hat1_1s <- sum(counterfactuals$Y_hat1)
@@ -339,7 +335,7 @@ pattc_ensemble <- function(response.formula,
     pattc <-list(estimate,
                  pattc_xsq$method,
                  statistic)
-  }  else if (!binary.outcome){
+  }  else if (!binary.preds){
     if (bootstrap) {
       bootResults <- matrix(NA, nrow = nboot, ncol = ncol(counterfactuals)+1)
       for (i in seq_len(nboot)){

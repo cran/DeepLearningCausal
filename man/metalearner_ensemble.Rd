@@ -5,25 +5,40 @@
 \title{metalearner_ensemble}
 \usage{
 metalearner_ensemble(
-  data,
+  data = NULL,
+  train.data = NULL,
+  test.data = NULL,
   cov.formula,
   treat.var,
   meta.learner.type,
-  SL.learners = c("SL.glmnet", "SL.xgboost", "SL.ranger", "SL.nnet"),
+  SL.learners = c("SL.glmnet", "SL.xgboost", "SL.nnet"),
   nfolds = 5,
-  binary.outcome = FALSE
+  family = gaussian(),
+  binary.preds = FALSE,
+  conformal = FALSE,
+  alpha = 0.1,
+  calib_frac = 0.5,
+  seed = 1234
 )
 }
 \arguments{
-\item{data}{\code{data.frame} object of data}
+\item{data}{\code{data.frame} object of data for cross-validation}
 
-\item{cov.formula}{formula description of the model y ~ x(list of covariates)}
+\item{train.data}{\code{data.frame} object of training data
+argument to separately train the meta-learners on training data.}
+
+\item{test.data}{\code{data.frame} object of test data
+argument to estimate CATEs on the test data.}
+
+\item{cov.formula}{formula description of the model y ~ x(list of covariates)
+permits users to incorporate outcome variable and confounders in model.}
 
 \item{treat.var}{string for the name of treatment variable.}
 
 \item{meta.learner.type}{string specifying is the S-learner and
 \code{"T.Learner"} for the T-learner model.
-\code{"X.Learner"} for the X-learner model.}
+\code{"X.Learner"} for the X-learner model.
+\code{"R.Learner"} for the X-learner model.}
 
 \item{SL.learners}{vector for super learner ensemble that includes extreme gradient
 boosting, glmnet, random forest, and neural nets.}
@@ -31,8 +46,18 @@ boosting, glmnet, random forest, and neural nets.}
 \item{nfolds}{number of folds for cross-validation. Currently supports up to
 5 folds.}
 
-\item{binary.outcome}{logical specifying predicted outcome variable will take
-binary values or proportions.}
+\item{family}{gaussian() or binomial() family for outcome variable.
+5 folds.}
+
+\item{binary.preds}{logical for whether outcome predictions should be binary}
+
+\item{conformal}{logical for whether to compute conformal prediction intervals}
+
+\item{alpha}{proportion for conformal prediction intervals}
+
+\item{calib_frac}{fraction of training data to use for calibration in conformal inference}
+
+\item{seed}{random seed}
 }
 \value{
 \code{metalearner_ensemble} of predicted outcome values and CATEs
@@ -40,7 +65,7 @@ estimated by the meta learners for each observation.
 }
 \description{
 \code{metalearner_ensemble} implements the S-learner, T-learner, and X-learner for
-estimating CATE using the super learner ensemble method. The super learner in
+weighted ensemble learning estimation of CATEs using super learner. The super learner in
 this case includes the following machine learning algorithms:
 extreme gradient boosting, glmnet (elastic net regression), random forest and
 neural nets.
@@ -59,7 +84,8 @@ slearner <- metalearner_ensemble(cov.formula = support_war ~ age +
                                 meta.learner.type = "S.Learner",
                                 SL.learners = c("SL.glm"),
                                 nfolds = 5,
-                                binary.outcome = FALSE)
+                                binary.preds = FALSE,
+                                )
 print(slearner)
 
 \donttest{
@@ -70,10 +96,11 @@ tlearner <- metalearner_ensemble(cov.formula = support_war ~ age + income +
                                   data = exp_data,
                                   treat.var = "strong_leader",
                                   meta.learner.type = "T.Learner",
-                                  SL.learners = c("SL.xgboost","SL.ranger",
+                                  SL.learners = c("SL.xgboost",
                                                "SL.nnet"),
                                   nfolds = 5,
-                                  binary.outcome = FALSE)
+                                  binary.preds = FALSE,
+                                  )
 
 print(tlearner)
                                   }
@@ -83,13 +110,13 @@ print(tlearner)
 set.seed(123456)
 xlearner <- metalearner_ensemble(cov.formula = support_war ~ age + income +
  employed  + job_loss,
-                                 data = exp_data,
+                                 test.data = exp_data,
+                                 train.data = exp_data,
                                  treat.var = "strong_leader",
                                  meta.learner.type = "X.Learner",
                                  SL.learners = c("SL.glmnet","SL.xgboost", 
-                                 "SL.ranger","SL.nnet"),
-                                 nfolds = 5,
-                                 binary.outcome = TRUE)
+                                 "SL.nnet"),
+                                 binary.preds = TRUE)
 
 print(xlearner)
                                   }
